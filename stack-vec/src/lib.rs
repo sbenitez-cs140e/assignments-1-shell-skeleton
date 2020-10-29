@@ -172,30 +172,59 @@ impl<'a, T: Clone + 'a> IndexMut<usize> for StackVec<'a, T> {
 
 // FIXME: Implement IntoIterator` for `&StackVec`.
 
-pub struct StackVecIntoIterator<'a, T: 'a> {
-    stackvec: StackVec<'a, T>,
+pub struct StackVecIterator<'a, T: 'a> {
+    stackvec: &'a StackVec<'a, T>,
     index: usize,
+    len: usize,
 }
 
-impl<'a, T: Clone + 'a> IntoIterator for StackVec<'a, T> {
-    type Item = T;
-    type IntoIter = StackVecIntoIterator<'a, T>;
+impl<'a, T: Clone + 'a> IntoIterator for &'a StackVec<'a, T> {
+    type Item = &'a T;
+    type IntoIter = StackVecIterator<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        StackVecIntoIterator {
+        StackVecIterator {
             stackvec: self,
             index: 0,
+            len: self.len(),
         }
     }
 }
 
-impl<'a, T: Clone + 'a> Iterator for StackVecIntoIterator<'a, T> {
+impl<'a, T: Clone + 'a> Iterator for StackVecIterator<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.len > self.index {
+            let prev_idx = self.index;
+            self.index += 1;
+
+            Some(&self.stackvec[prev_idx])
+        } else {
+            None
+        }
+    }
+}
+
+pub struct StackVecOwningIterator<'a, T: 'a> {
+    stackvec: StackVec<'a, T>,
+}
+
+impl<'a, T: Clone + 'a> IntoIterator for StackVec<'a, T> {
+    type Item = T;
+    type IntoIter = StackVecOwningIterator<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        StackVecOwningIterator {
+            stackvec: self,
+        }
+    }
+}
+
+impl<'a, T: Clone + 'a> Iterator for StackVecOwningIterator<'a, T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = self.stackvec.pop().clone();
-        self.index += 1;
-
-        result
+        self.stackvec.pop()
     }
 }
