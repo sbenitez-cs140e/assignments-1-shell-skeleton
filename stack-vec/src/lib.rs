@@ -120,6 +120,7 @@ impl<'a, T: 'a> StackVec<'a, T> {
     }
 }
 
+// TODO: this is probably broken and pop should consume
 impl<'a, T: Clone + 'a> StackVec<'a, T> {
     /// If this vector is not empty, removes the last element from this vector
     /// by cloning it and returns it. Otherwise returns `None`.
@@ -206,6 +207,14 @@ impl<'a, T: Clone + 'a> Iterator for StackVecIterator<'a, T> {
     }
 }
 
+// EddyP: TODO ideas:
+// 1)  Maybe the StackVec impls are too clone-heavy,
+// which forces dropping of returned items, hence making the
+// lifetime of references limited to local scope, unless
+// owned values are returned as owned values.
+// 2) IndexMut::index_mut looks like what I need, but it
+// seemed it didn't work
+//
 // pub struct StackVecOwningIterator<'a, T: 'a> {
 //     stackvec: StackVec<'a, T>,
 //     index: usize,
