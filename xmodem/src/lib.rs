@@ -173,7 +173,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
     /// byte was not `byte`, if the read byte was `CAN` and `byte` is not `CAN`,
     /// or if writing the `CAN` byte failed on byte mismatch.
     fn expect_byte_or_cancel(&mut self, byte: u8, msg: &'static str) -> io::Result<u8> {
-        let read_byte = self.read_byte(true)?;
+        let read_byte = self.read_byte(false)?;
         if read_byte == byte {
             Ok(byte)
         } else {
