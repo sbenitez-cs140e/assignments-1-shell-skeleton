@@ -164,7 +164,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
     /// If the bytes match, the byte is returned as an `Ok`. If they differ and
     /// the read byte is not `CAN`, an error of `InvalidData` with the message
     /// `expected` is returned. If they differ and the read byte is `CAN`, an
-    /// error of `ConnectionAborted` is returned. In either case, if they bytes
+    /// error of `ConnectionAborted` is returned. In either case, if the bytes
     /// differ, a `CAN` byte is written out to the inner stream.
     ///
     /// # Errors
