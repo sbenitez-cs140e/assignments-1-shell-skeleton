@@ -176,6 +176,8 @@ impl<T: io::Read + io::Write> Xmodem<T> {
         self.expect_byte_opt_cancel(byte, msg, true)
     }
 
+    // Function that implements both expect_byte_or_cancel and expect_byte
+    // functionality, as they are almost identical
     fn expect_byte_opt_cancel(&mut self, byte: u8, msg: &'static str, cancel: bool) -> io::Result<u8> {
         let read_byte = self.read_byte(false)?;
         if read_byte == byte {
