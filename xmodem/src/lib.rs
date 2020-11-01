@@ -184,7 +184,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
             Ok(byte)
         } else {
             if cancel {
-                self.write_byte(CAN);
+                self.write_byte(CAN)?;
             };
             if read_byte != CAN {
                 Err(io::Error::new(io::ErrorKind::InvalidData, expected))
