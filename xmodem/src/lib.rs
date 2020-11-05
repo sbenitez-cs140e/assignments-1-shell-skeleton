@@ -179,17 +179,19 @@ impl<T: io::Read + io::Write> Xmodem<T> {
     // Function that implements both expect_byte_or_cancel and expect_byte
     // functionality, as they are almost identical
     fn expect_byte_opt_cancel(&mut self, byte: u8, expected: &'static str, cancel: bool) -> io::Result<u8> {
-        let read_byte = self.read_byte(false)?;
-        if read_byte == byte {
-            Ok(byte)
-        } else {
-            if cancel {
-                self.write_byte(CAN)?;
-            };
-            if read_byte != CAN {
+        match self.read_byte(false) {
+            Ok(b) if b == byte => Ok(byte),
+            Ok(b) => {
+                if cancel { dbg!(self.write_byte(CAN))?; };
+                if b != CAN {
+                     Err(io::Error::new(io::ErrorKind::InvalidData, expected))
+                } else {
+                    Err(io::Error::new(io::ErrorKind::ConnectionAborted, "received CAN"))
+                }
+            }
+            Err(_) => {
+                if cancel { self.write_byte(CAN)?; };
                 Err(io::Error::new(io::ErrorKind::InvalidData, expected))
-            } else {
-                Err(io::Error::new(io::ErrorKind::ConnectionAborted, "received CAN"))
             }
         }
     }
