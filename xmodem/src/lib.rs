@@ -238,7 +238,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
         if buf.len() < 128 {
             Err(io::Error::new(io::ErrorKind::UnexpectedEof, "expected 128"))
         } else {
-            for _ in 0..10 {
+            // for _ in 0..10 {
                 if !self.started && self.packet == 1 {
                     self.write_byte(NAK)?;
                 }
@@ -291,7 +291,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
                     Err(e) => return Err(e),
                     Ok(_) => self.write_byte(NAK)?,
                 }
-            }
+            // }
 
             self.write_byte(CAN)?;
 
@@ -329,9 +329,68 @@ impl<T: io::Read + io::Write> Xmodem<T> {
     /// received when not expected.
     ///
     /// An error of kind `Interrupted` is returned if a packet checksum fails.
-    pub fn write_packet(&mut self, _buf: &[u8]) -> io::Result<usize> {
-        // TODO: cheap pass for test_small_packet_eof_error
-        Err(io::Error::new(io::ErrorKind::UnexpectedEof, "XXX"))
+    pub fn write_packet(&mut self, buf: &[u8]) -> io::Result<usize> {
+        dbg!(format!("Start write packet - {} {:?}", self.packet, &buf[..]));
+
+        let mut len = buf.len();
+        if len < 128 && len != 0 {
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "buf size"));
+        };
+
+        if !self.started {
+            (self.progress)(Progress::Waiting);
+            let _ = self.expect_byte(NAK, "expected NAK")?;
+        }
+
+        if dbg!(len) != 0 {
+            len = 128;
+
+            // for _ in 0..10 {
+                dbg!();
+                self.write_byte(SOH)?;
+
+                if !self.started && self.packet == 1 {
+                    (self.progress)(Progress::Started);
+                    self.started = true;
+                }
+
+                let pkt_num = self.packet;
+                self.write_byte(pkt_num)?;
+                let pkt_num = 255 - pkt_num;
+                self.write_byte(pkt_num)?;
+
+                let mut sum = 0u8;
+                for i in 0..128 {
+                    let byte = buf[i];
+                    let _ = self.write_byte(byte)?;
+                    sum = sum.wrapping_add(byte);
+                }
+                let _ = self.write_byte(sum)?;
+                let b = self.read_byte(false)?;
+                match b {
+                    ACK => {
+                        (self.progress)(Progress::Packet(self.packet));
+                        // dbg!();
+                        self.packet += 1;
+
+                    }
+                    NAK => {
+                        // dbg!("repeat, please"); continue;
+                        return Err(io::Error::new(io::ErrorKind::Interrupted, "NAK expected"));
+                    }
+                    _ => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "XXX")),
+                }
+            // }
+
+        } else {
+            dbg!("Zero size buffer/slice");
+            dbg!(self.write_byte(EOT))?;
+            dbg!(self.expect_byte(NAK, "expected final NAK"))?;
+            dbg!(self.write_byte(EOT))?;
+            dbg!(self.expect_byte(ACK, "expected final ACK"))?;
+        };
+
+        Ok(len)
     }
 
     /// Flush this output stream, ensuring that all intermediately buffered
