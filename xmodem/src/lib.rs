@@ -25,6 +25,10 @@ pub struct Xmodem<R> {
     progress: ProgressFn
 }
 
+fn complement1(n: u8) -> u8 {
+    255 - n
+}
+
 impl Xmodem<()> {
     /// Transmits `data` to the receiver `to` using the XMODEM protocol. If the
     /// length of the total data yielded by `data` is not a multiple of 128
@@ -285,7 +289,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
                     // directly, even if self.packet is Copy
                     let packet = self.packet;
                     self.expect_byte_or_cancel(packet, "checksum")?;
-                    self.expect_byte_or_cancel(255 - packet, "checksum complement")?;
+                    self.expect_byte_or_cancel(complement1(packet), "checksum complement")?;
                 }
 
                 let mut cancelled = false;
@@ -385,8 +389,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
 
                 let pkt_num = self.packet;
                 self.write_byte(pkt_num)?;
-                let pkt_num = 255 - pkt_num;
-                self.write_byte(pkt_num)?;
+                self.write_byte(complement1(pkt_num))?;
 
                 let mut sum = 0u8;
                 for i in 0..128 {
