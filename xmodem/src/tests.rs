@@ -41,7 +41,6 @@ impl io::Write for Pipe {
 }
 
 #[test]
-#[ignore]
 fn test_loop() {
     let mut input = [0u8; 384];
     for (i, chunk) in input.chunks_mut(128).enumerate() {
@@ -128,7 +127,6 @@ fn test_cancel_on_unexpected() {
 }
 
 #[test]
-#[ignore]
 fn test_can_in_packet_and_checksum() {
     let mut input = [0u8; 256];
     input[0] = CAN;
@@ -146,7 +144,6 @@ fn test_can_in_packet_and_checksum() {
 }
 
 #[test]
-#[ignore]
 fn test_transmit_reported_bytes() {
     let (input, mut output) = ([0u8; 50], [0u8; 128]);
     let (tx, rx) = pipe();
@@ -157,7 +154,6 @@ fn test_transmit_reported_bytes() {
 }
 
 #[test]
-#[ignore]
 fn test_raw_transmission() {
     let mut input = [0u8; 256];
     let mut output = [0u8; 256];

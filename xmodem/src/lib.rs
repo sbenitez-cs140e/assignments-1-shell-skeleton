@@ -14,6 +14,9 @@ const ACK: u8 = 0x06;
 const NAK: u8 = 0x15;
 const CAN: u8 = 0x18;
 
+const ABORT_IF_CAN: bool = true;
+const NO_ABORT_IF_CAN: bool = false;
+
 /// Implementation of the XMODEM protocol.
 pub struct Xmodem<R> {
     packet: u8,
@@ -173,13 +176,23 @@ impl<T: io::Read + io::Write> Xmodem<T> {
     /// byte was not `byte`, if the read byte was `CAN` and `byte` is not `CAN`,
     /// or if writing the `CAN` byte failed on byte mismatch.
     fn expect_byte_or_cancel(&mut self, byte: u8, expected: &'static str) -> io::Result<u8> {
-        self.expect_byte_opt_cancel(byte, expected, true)
+        // self.expect_byte_opt_cancel(byte, expected, true)
+        let read_byte = self.read_byte(NO_ABORT_IF_CAN)?;
+        if read_byte == byte {
+            Ok(read_byte)
+        } else if read_byte != CAN {
+            self.write_byte(CAN)?;
+            Err(io::Error::new(io::ErrorKind::InvalidData, expected))
+        } else {
+            self.write_byte(CAN)?;
+            Err(io::Error::new(io::ErrorKind::ConnectionAborted, "Cancelled"))
+        }
     }
 
     // Function that implements both expect_byte_or_cancel and expect_byte
     // functionality, as they are almost identical
     fn expect_byte_opt_cancel(&mut self, byte: u8, expected: &'static str, cancel: bool) -> io::Result<u8> {
-        match self.read_byte(false) {
+        match self.read_byte(NO_ABORT_IF_CAN) {
             Ok(b) if b == byte => Ok(byte),
             Ok(b) => {
                 if cancel { dbg!(self.write_byte(CAN))?; };
@@ -238,26 +251,26 @@ impl<T: io::Read + io::Write> Xmodem<T> {
         if buf.len() < 128 {
             Err(io::Error::new(io::ErrorKind::UnexpectedEof, "expected 128"))
         } else {
-            // for _ in 0..10 {
+            for _ in 0..10 {
                 if !self.started && self.packet == 1 {
+                    // NCGByte - downloader/receiver is ready to start
                     self.write_byte(NAK)?;
                 }
-                let try_expect_soh = self.expect_byte(SOH, "want SOH");
-                match try_expect_soh {
-                    Err(e) => {
-                        if e.kind() == io::ErrorKind::InvalidData {
-                            // End the reception?
-                            self.expect_byte_or_cancel(EOT, "no SOH, so expected EOT")?;
-                            self.write_byte(NAK)?;
-                            self.expect_byte_or_cancel(EOT, "expected 2nd EOT")?;
-                            self.write_byte(ACK)?;
-                            return Ok(0);
-                        } else {
-                            return Err(e);
-                        }
+
+                match self.read_byte(ABORT_IF_CAN /* ??? */)? {
+                    c if c == EOT => {
+                        // not SOH, end the reception?
+                        self.write_byte(NAK)?;
+                        self.expect_byte(EOT, "expected 2nd EOT")?;
+                        self.write_byte(ACK)?;
+                        return Ok(0);
+                    },
+                    c if c == SOH => (), // SOH received
+                    c => {
+                        dbg!("Expected SOH or EOT, got {}", c);
+                        return Err(io::Error::new(io::ErrorKind::InvalidData, "Expected SOH or EOT"));
                     }
-                    Ok(_) => (), // SOH received
-                };
+                }
 
                 // callback
                 if !self.started && self.packet == 1 {
@@ -275,12 +288,28 @@ impl<T: io::Read + io::Write> Xmodem<T> {
                     self.expect_byte_or_cancel(255 - packet, "checksum complement")?;
                 }
 
+                let mut cancelled = false;
                 for i in 0..128 {
-                    buf[i] = self.read_byte(false)?;
+                    buf[i] = match self.read_byte(NO_ABORT_IF_CAN) {
+                        Ok(CAN) if !cancelled => {
+                            cancelled = true;
+                            CAN
+                        },
+                        Ok(CAN) =>
+                            {
+                                dbg!(i, "CANCELLED");
+                                return Err(io::Error::new(io::ErrorKind::ConnectionAborted, "connection aborted"));
+                            }
+                        Ok(x) => {
+                            cancelled = false;
+                            x
+                        },
+                        Err(e) => { return Err(e); }
+                    }
                 }
 
                 let checksum = buf.iter().fold(0u8, |acc, x| acc.wrapping_add(*x));
-                match self.read_byte(false) {
+                match self.read_byte(NO_ABORT_IF_CAN) {
                     Ok(c) if c == checksum => {
                         self.write_byte(ACK)?;
                         (self.progress)(Progress::Packet(self.packet));
@@ -291,7 +320,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
                     Err(e) => return Err(e),
                     Ok(_) => self.write_byte(NAK)?,
                 }
-            // }
+            }
 
             self.write_byte(CAN)?;
 
@@ -366,7 +395,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
                     sum = sum.wrapping_add(byte);
                 }
                 let _ = self.write_byte(sum)?;
-                let b = self.read_byte(false)?;
+                let b = self.read_byte(ABORT_IF_CAN)?;
                 match b {
                     ACK => {
                         (self.progress)(Progress::Packet(self.packet));
