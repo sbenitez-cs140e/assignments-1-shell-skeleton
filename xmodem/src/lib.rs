@@ -189,7 +189,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
         match self.read_byte(NO_ABORT_IF_CAN) {
             Ok(b) if b == byte => Ok(byte),
             Ok(b) => {
-                if cancel { dbg!(self.write_byte(CAN))?; };
+                if cancel { self.write_byte(CAN)?; };
                 if b != CAN {
                      Err(io::Error::new(io::ErrorKind::InvalidData, expected))
                 } else {
@@ -261,8 +261,9 @@ impl<T: io::Read + io::Write> Xmodem<T> {
                     },
                     c if c == SOH => (), // SOH received
                     c => {
-                        dbg!("Expected SOH or EOT, got {}", c);
-                        return Err(io::Error::new(io::ErrorKind::InvalidData, "Expected SOH or EOT"));
+                        // dbg!("Expected SOH or EOT, got {}", c);
+                        return Err(io::Error::new(io::ErrorKind::InvalidData,
+                            format!("Expected SOH or EOT got {}", c)));
                     }
                 }
 
@@ -291,7 +292,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
                         },
                         Ok(CAN) =>
                             {
-                                dbg!(i, "CANCELLED");
+                                // dbg!(i, "CANCELLED");
                                 return Err(io::Error::new(io::ErrorKind::ConnectionAborted, "connection aborted"));
                             }
                         Ok(x) => {
@@ -353,7 +354,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
     ///
     /// An error of kind `Interrupted` is returned if a packet checksum fails.
     pub fn write_packet(&mut self, buf: &[u8]) -> io::Result<usize> {
-        dbg!(format!("Start write packet - {} {:?}", self.packet, &buf[..]));
+        // dbg!(format!("Start write packet - {} {:?}", self.packet, &buf[..]));
 
         let mut len = buf.len();
         if len < 128 && len != 0 {
@@ -365,11 +366,10 @@ impl<T: io::Read + io::Write> Xmodem<T> {
             let _ = self.expect_byte(NAK, "expected NAK")?;
         }
 
-        if dbg!(len) != 0 {
+        if len != 0 {
             len = 128;
 
             // for _ in 0..10 {
-                dbg!();
                 self.write_byte(SOH)?;
 
                 if !self.started && self.packet == 1 {
@@ -405,11 +405,11 @@ impl<T: io::Read + io::Write> Xmodem<T> {
             // }
 
         } else {
-            dbg!("Zero size buffer/slice");
-            dbg!(self.write_byte(EOT))?;
-            dbg!(self.expect_byte(NAK, "expected final NAK"))?;
-            dbg!(self.write_byte(EOT))?;
-            dbg!(self.expect_byte(ACK, "expected final ACK"))?;
+            // dbg!("Zero size buffer/slice");
+            self.write_byte(EOT)?;
+            self.expect_byte(NAK, "expected final NAK")?;
+            self.write_byte(EOT)?;
+            self.expect_byte(ACK, "expected final ACK")?;
         };
 
         Ok(len)
