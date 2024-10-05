@@ -180,17 +180,7 @@ impl<T: io::Read + io::Write> Xmodem<T> {
     /// byte was not `byte`, if the read byte was `CAN` and `byte` is not `CAN`,
     /// or if writing the `CAN` byte failed on byte mismatch.
     fn expect_byte_or_cancel(&mut self, byte: u8, expected: &'static str) -> io::Result<u8> {
-        // self.expect_byte_opt_cancel(byte, expected, true)
-        let read_byte = self.read_byte(NO_ABORT_IF_CAN)?;
-        if read_byte == byte {
-            Ok(read_byte)
-        } else if read_byte != CAN {
-            self.write_byte(CAN)?;
-            Err(io::Error::new(io::ErrorKind::InvalidData, expected))
-        } else {
-            self.write_byte(CAN)?;
-            Err(io::Error::new(io::ErrorKind::ConnectionAborted, "Cancelled"))
-        }
+        self.expect_byte_opt_cancel(byte, expected, ABORT_IF_CAN)
     }
 
     // Function that implements both expect_byte_or_cancel and expect_byte
